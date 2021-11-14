@@ -30,14 +30,17 @@ if __name__ == '__main__':
     max_depth = 16
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
+    sample_counts = ti.field(dtype=ti.i32)
     pixels = ti.Vector.field(3, dtype=float)
-    inner_queue = ti.field(dtype=ti.i32)
-    # ti.root.dense(ti.i, (image_width * image_height)).place(inner_queue)
-    sample_count = ti.field(dtype=ti.i32)
-    needs_sample = ti.field(dtype=ti.i32)
+    # Queue will track x,y and sample field
+    # inner_queue_1 = ti.Vector.field(2, dtype=ti.i32)
+    inner_queue_1 = ti.field(ti.i32)
+    # inner_queue_2 = ti.field(ti.i32)
+    # Double buffer the queue
+    ti.root.dynamic(ti.i, image_width*image_height*samples_per_pixel*max_depth).place(inner_queue_1)
+    # ti.root.dynamic(ti.i, image_width * image_height).place(inner_queue_2)
     ti.root.dense(ti.ij,
-                  (image_width, image_height)).place(pixels, sample_count,
-                                                     needs_sample, inner_queue)
+                  (image_width, image_height)).place(pixels, sample_counts)
 
     # materials
     mat_ground = Lambert([0.5, 0.5, 0.5])
@@ -99,7 +102,7 @@ if __name__ == '__main__':
             pixels[x, y] = ti.sqrt(pixels[x, y] / samples_per_pixel)
 
     @ti.kernel
-    def wavefront_initial():
+    def wavefront_initial() -> ti.i32:
         for x, y in pixels:
             # gen sample
             depth = max_depth
@@ -109,32 +112,13 @@ if __name__ == '__main__':
             v = (y + ti.random()) / (image_height - 1)
             ray_org, ray_dir = cam.get_ray(u, v)
             rays.set(x, y, ray_org, ray_dir, depth, pdf)
-            needs_sample[x, y] = 1
-            sample_count[x, y] = 0
+            sample_counts[x,y] = 0
+            inner_queue_1[x*image_height + y] = x*image_height + y
+
+        return image_height * image_width
 
     @ti.kernel
-    def fill_inner_queue() -> ti.i32:
-        ind = 0
-        for x,y in sample_count:
-            if sample_count[x,y] < samples_per_pixel:
-                inner_queue[x, y] = 1
-                ind += 1
-
-        return ind
-
-
-    # def fix_inner_queue():
-    #     # Put all vectors in first num_to_do spots
-    #     ind = 0
-    #     done = 0
-    #     while done < num_to_do:
-    #         while inner_queue[ind] is ti.Vector([-1,-1]):
-    #             ind += 1
-    #         inner_queue[done] = inner_queue[ind]
-    #         done += 1
-
-    @ti.kernel
-    def wavefront_queue():
+    def wavefront_queue_1(start: ti.i32, to_do: ti.i32) -> ti.i32:
         ''' Loops over pixels
             for each pixel:
                 generate ray if needed
@@ -142,10 +126,14 @@ if __name__ == '__main__':
                 if miss or last bounce sample backgound
             return pixels that hit max samples
         '''
-        for x,y in inner_queue:
-            if inner_queue[x, y] == 0:
-                continue
-            inner_queue[x, y] = 0
+        num_added = 0
+        for ind in range(start, start + to_do):
+            # print(ind)
+            x = inner_queue_1[ind] // image_height
+            y = inner_queue_1[ind] % image_height
+            # print(x,y)
+            sample_count = sample_counts[x,y]
+
             # gen sample
             ray_org, ray_dir, depth, pdf = rays.get(x, y)
 
@@ -161,8 +149,6 @@ if __name__ == '__main__':
                 ray_dir = out_direction
 
             if not hit or depth == 0:
-                sample_count[x, y] += 1
-                # needs_sample[x, y] = 1
                 pixels[x, y] += pdf * get_background(ray_dir)
                 u = (x + ti.random()) / (image_width - 1)
                 v = (y + ti.random()) / (image_height - 1)
@@ -170,20 +156,32 @@ if __name__ == '__main__':
                 pdf = start_attenuation
                 ray_org, ray_dir = cam.get_ray(u, v)
                 rays.set(x, y, ray_org, ray_dir, depth, pdf)
+                sample_count += 1
+
+            sample_counts[x,y] = sample_count
+
+            if sample_count < samples_per_pixel:
+                g = x * image_height + y
+                ti.append(inner_queue_1.parent(), [], g)
+                num_added += 1
+
+        return num_added
 
     num_pixels = image_width * image_height
 
     t = time()
     print('starting big wavefront')
-    wavefront_initial()
-    num_to_do = fill_inner_queue()
-    print(num_to_do)
-    # print(inner_queue.to_numpy())
-    # fix_inner_queue()
+    queue_start = 0
+    next_queue_start = num_pixels
+    loop_count = 0
+    num_to_do = wavefront_initial()
+    start = 0
     while num_to_do > 0:
-        wavefront_queue()
-        num_to_do = fill_inner_queue()
-        # fix_inner_queue()
+        inn = inner_queue_1.to_numpy()
+        old_end = start + num_to_do
+        num_to_do = wavefront_queue_1(start, num_to_do)
+        start = old_end
+
     finish()
     print(time() - t)
-    ti.imwrite(pixels.to_numpy(), 'out_no_queue.png')
+    ti.imwrite(pixels.to_numpy(), 'out_micro.png')
