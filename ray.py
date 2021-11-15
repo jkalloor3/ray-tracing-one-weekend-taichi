@@ -9,6 +9,7 @@ def at(origin, direction, t):
 @ti.data_oriented
 class Rays:
     ''' An array of "in flight" rays'''
+
     def __init__(self, x, y):
         self.origin = ti.Vector.field(3, dtype=ti.f32)
         self.direction = ti.Vector.field(3, dtype=ti.f32)
