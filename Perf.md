@@ -1,5 +1,13 @@
 # RTX 3080
 
+```
+Naive = main_naive.py
+Mega loop = main_mega.py
+Bitmasked = main_bitmasked.py
+Queue = ...?
+Lockless = main_lockless_queue.py (with bugs)
+```
+
 `num_samples=1`
 
 | Method    | OpenGL              | CUDA                 | Vulkan              |
