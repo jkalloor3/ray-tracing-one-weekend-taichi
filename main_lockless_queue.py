@@ -1,4 +1,5 @@
 import numpy as np
+from taichi_glsl.experimental_array import dtype
 import taichi as ti
 from vector import *
 import ray
@@ -16,7 +17,9 @@ ti.init(arch=ti.gpu)
 @ti.data_oriented
 class Queue:
     def __init__(self, struct, size) -> None:
-        self.struct_field = struct.field(shape=(size))
+        self.struct_field = struct.field()
+        self.struct_field_lock = ti.field(dtype=ti.i32)
+        ti.root.dense(ti.i, (size)).place(self.struct_field, self.struct_field_lock)
         self.read_idx = ti.field(dtype=ti.i32, shape=())
         self.write_idx = ti.field(dtype=ti.i32, shape=())
         self.size = size
@@ -29,7 +32,13 @@ class Queue:
             if idx - queue_read_idx <= self.size:
                 break
         self.struct_field[idx % self.size] = struct
+        self.struct_field_lock[idx % self.size] = 1
         return idx
+
+    @ti.kernel
+    def clear(self):
+        self.read_idx[()] = 0
+        self.write_idx[()] = 0
 
     @ti.func
     def pop(self):
@@ -38,7 +47,12 @@ class Queue:
 
     @ti.func
     def get(self, idx : ti.i32) -> ti.template():
-        return self.struct_field[idx % self.size]
+        while True:
+            if self.struct_field_lock[idx % self.size] == 1:
+                break
+        s = self.struct_field[idx % self.size]
+        self.struct_field_lock[idx % self.size] = 0
+        return s
 
     @ti.func
     def get_read_idx(self) -> ti.i32:
@@ -62,8 +76,8 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 8
-    max_depth = 16
+    samples_per_pixel = 1
+    max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
     pixels = ti.Vector.field(3, dtype=float)
@@ -150,6 +164,12 @@ if __name__ == '__main__':
             next_ray = ray_sample(org = ray_org, dir = ray_dir, depth = d, x = x, y = y, pdf = pdf)
             ray_queue.push(next_ray)
             sample_count[x, y] = 0
+            pixels[x, y] = Vector(0.0, 0.0, 0.0)
+
+    @ti.kernel
+    def finish():
+        for x, y in pixels:
+            pixels[x, y] = ti.sqrt(pixels[x, y] / samples_per_pixel)
 
     @ti.kernel
     def wavefront_queue():
@@ -160,7 +180,7 @@ if __name__ == '__main__':
                 if miss or last bounce sample backgound
             return pixels that hit max samples
         '''
-        for i in range(1024 * 24):
+        for i in range(256 * 6 * 12):
             while True:
                 queue_idx = ray_queue.pop()
                 while True:
@@ -192,7 +212,6 @@ if __name__ == '__main__':
                 if not hit or depth == 0:
                     pixels[x, y] += pdf * get_background(ray_dir)
                     if ti.atomic_add(sample_count[x, y], 1) >= samples_per_pixel - 1:
-                        pixels[x, y] = ti.sqrt(pixels[x, y] / samples_per_pixel)
                         num_completed[()] += 1
                     else:
                         u = (x + ti.random()) / (image_width - 1)
@@ -206,10 +225,18 @@ if __name__ == '__main__':
 
     num_pixels = image_width * image_height
 
-    t = time()
-    print('starting big wavefront')
     num_to_do = wavefront_initial()
     wavefront_queue()
+    finish()
+    ray_queue.clear()
+    num_completed[()] = 0
+    ti.sync()
+
+    print('starting big wavefront')
+    t = time()
+    num_to_do = wavefront_initial()
+    wavefront_queue()
+    finish()
     ti.sync()
     print(time() - t)
     ti.imwrite(pixels.to_numpy(), 'out_lockless_q.png')

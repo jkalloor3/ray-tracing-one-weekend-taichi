@@ -29,8 +29,8 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 8
-    max_depth = 16
+    samples_per_pixel = 1
+    max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
     pixels = ti.Vector.field(3, dtype=float)
@@ -89,7 +89,6 @@ if __name__ == '__main__':
     start_attenuation = Vector(1.0, 1.0, 1.0)
     initial = True
 
-    num_completed = 0
     num_pixels = image_width * image_height
 
     @ti.kernel
@@ -104,6 +103,7 @@ if __name__ == '__main__':
             ray_org, ray_dir = cam.get_ray(u, v)
             rays.set(x, y, ray_org, ray_dir, depth, pdf)
             sample_count[x, y] = 0
+            pixels[x, y] = Vector(0.0, 0.0, 0.0)
 
     @ti.kernel
     def wavefront_queue():
@@ -145,8 +145,12 @@ if __name__ == '__main__':
 
     num_pixels = image_width * image_height
 
-    t = time()
+    num_to_do = wavefront_initial()
+    wavefront_queue()
+    ti.sync()
+
     print('starting big wavefront')
+    t = time()
     num_to_do = wavefront_initial()
     wavefront_queue()
     ti.sync()

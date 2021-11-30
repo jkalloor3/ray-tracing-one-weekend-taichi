@@ -29,18 +29,17 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 8
-    max_depth = 16
+    samples_per_pixel = 1
+    max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
     pixels = ti.Vector.field(3, dtype=float)
     inner_queue = ti.field(dtype=ti.i32)
     # ti.root.dense(ti.i, (image_width * image_height)).place(inner_queue)
     sample_count = ti.field(dtype=ti.i32)
-    needs_sample = ti.field(dtype=ti.i32)
     ti.root.dense(ti.ij,
                   (image_width, image_height)).place(pixels, sample_count,
-                                                     needs_sample, inner_queue)
+                                                     inner_queue)
 
     # materials
     mat_ground = Lambert([0.5, 0.5, 0.5])
@@ -112,8 +111,8 @@ if __name__ == '__main__':
             v = (y + ti.random()) / (image_height - 1)
             ray_org, ray_dir = cam.get_ray(u, v)
             rays.set(x, y, ray_org, ray_dir, depth, pdf)
-            needs_sample[x, y] = 1
             sample_count[x, y] = 0
+            pixels[x, y] = Vector(0.0, 0.0, 0.0)
 
     @ti.kernel
     def fill_inner_queue() -> ti.i32:
@@ -164,7 +163,6 @@ if __name__ == '__main__':
 
             if not hit or depth == 0:
                 sample_count[x, y] += 1
-                # needs_sample[x, y] = 1
                 pixels[x, y] += pdf * get_background(ray_dir)
                 u = (x + ti.random()) / (image_width - 1)
                 v = (y + ti.random()) / (image_height - 1)
@@ -175,17 +173,23 @@ if __name__ == '__main__':
 
     num_pixels = image_width * image_height
 
-    t = time()
-    print('starting big wavefront')
+    # Run two times to get rid of JIT
     wavefront_initial()
     num_to_do = fill_inner_queue()
     print(num_to_do)
-    # print(inner_queue.to_numpy())
-    # fix_inner_queue()
     while num_to_do > 0:
         wavefront_queue()
         num_to_do = fill_inner_queue()
-        # fix_inner_queue()
+    finish()
+
+    print('starting big wavefront')
+    t = time()
+    wavefront_initial()
+    num_to_do = fill_inner_queue()
+    print(num_to_do)
+    while num_to_do > 0:
+        wavefront_queue()
+        num_to_do = fill_inner_queue()
     finish()
     ti.sync()
     print(time() - t)
