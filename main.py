@@ -12,7 +12,7 @@ import random
 
 
 # switch to cpu if needed
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.gpu, kernel_profiler=True)
 
 
 @ti.func
@@ -193,4 +193,5 @@ if __name__ == '__main__':
     finish()
     ti.sync()
     print(time() - t)
+    ti.kernel_profiler_print()
     ti.imwrite(pixels.to_numpy(), 'out_no_queue.png')

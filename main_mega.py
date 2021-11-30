@@ -29,13 +29,13 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 1
+    samples_per_pixel = 32
     max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
     pixels = ti.Vector.field(3, dtype=float)
     sample_count = ti.field(dtype=ti.i32)
-    ti.root.bitmasked(ti.ij, (image_width, image_height)).place(sample_count)
+    ti.root.dense(ti.ij, (image_width, image_height)).place(sample_count)
     ti.root.dense(ti.ij, (image_width, image_height)).place(pixels)
 
     # materials

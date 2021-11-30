@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 1
+    samples_per_pixel = 32
     max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
