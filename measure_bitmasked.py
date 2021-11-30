@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
 
-    with open("bitmasked_output_7.csv", "w", newline="") as csv_file:
+    with open("bitmasked_output_1.csv", "w", newline="") as csv_file:
         csv_writer = csv.writer(csv_file)
 
         for i in range(5, 12, 2):
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                         ray_org, ray_dir, depth, pdf = rays.get(x, y)
 
                         # intersect
-                        hit, p, n, front_facing, index = world.hit_all_slow_7(ray_org, ray_dir)
+                        hit, p, n, front_facing, index = world.hit_all_slow_1(ray_org, ray_dir)
                         depth -= 1
                         rays.depth[x, y] = depth
                         if hit:
@@ -165,16 +165,18 @@ if __name__ == '__main__':
 
                 num_pixels = image_width * image_height
 
+                ti.sync()
                 t = time()
                 num_to_do = wavefront_initial()
                 while num_to_do > 0:
                     # print(num_to_do)
                     num_to_do = wavefront_queue()
                 finish()
+                ti.sync()
                 time_taken = time() - t
 
                 print(f'Width:{image_width}')
                 print(f'Samples:{samples_per_pixel}')
                 print(f"Time:{time_taken}")
 
-                csv_writer.writerow([image_width, samples_per_pixel, 7, time_taken])
+                csv_writer.writerow([image_width, samples_per_pixel, 1, time_taken])

@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     # Perform DFS on the nodes
 
-    adj_list = np.load("example_32768.npy")
+    adj_list = np.load("random_graphs/example_32768.npy")
 
     num_nodes, max_degree = adj_list.shape
 
