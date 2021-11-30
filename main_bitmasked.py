@@ -29,7 +29,7 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 256
+    samples_per_pixel = 8
     max_depth = 16
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
@@ -163,5 +163,6 @@ if __name__ == '__main__':
         # print(num_to_do)
         num_to_do = wavefront_queue()
     finish()
+    ti.sync()
     print(time() - t)
     ti.imwrite(pixels.to_numpy(), 'out_bitmasked.png')
