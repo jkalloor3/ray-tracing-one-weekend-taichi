@@ -92,6 +92,788 @@ class World:
     def bounding_box(self, i):
         return self.bvh_min(i), self.bvh_max(i)
 
+
+    @ti.func
+    def hit_all_slow_8(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -4:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 100,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -5:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 170,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -6:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 17,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            #
+            elif obj_id == -7:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 47,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -8:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 470,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_7(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -4:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 100,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -5:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 170,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -6:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 17,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            #
+            elif obj_id == -7:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 47,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_6(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -4:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 100,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -5:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 170,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -6:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 17,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_5(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -4:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 100,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -5:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 170,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_4(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -4:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 100,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_3(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            elif obj_id == -3:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 300,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_2(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            elif obj_id == -2:
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min * 200,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                elif t < 100:
+                    hit_anything = False
+                elif t < 200:
+                    hit = True
+                    hit_anything = not hit
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+    @ti.func
+    def hit_all_slow_1(self, ray_origin, ray_direction):
+        ''' Intersects a ray against all objects. '''
+        hit_anything = False
+        t_min = 0.0001
+        closest_so_far = 9999999999.9
+        hit_index = 0
+        p = Point(0.0, 0.0, 0.0)
+        n = Vector(0.0, 0.0, 0.0)
+        front_facing = True
+        i = 0
+        curr = self.bvh.bvh_root
+
+        # walk the bvh tree
+        while curr != -1:
+            obj_id, left_id, right_id, next_id = self.bvh.get_full_id(curr)
+
+            if obj_id > 0:
+                # this is a leaf node, check the sphere
+                hit, t = hit_sphere(self.center[obj_id], self.radius[obj_id],
+                                    ray_origin, ray_direction, t_min,
+                                    closest_so_far)
+                if hit:
+                    hit_anything = True
+                    closest_so_far = t
+                    hit_index = obj_id
+                curr = next_id
+            else:
+                if self.bvh.hit_aabb(curr, ray_origin, ray_direction, t_min,
+                                     closest_so_far):
+                    # add left and right children
+                    if left_id != -1:
+                        curr = left_id
+                    elif right_id != -1:
+                        curr = right_id
+                    else:
+                        curr = next_id
+                else:
+                    curr = next_id
+
+        if hit_anything:
+            p = ray.at(ray_origin, ray_direction, closest_so_far)
+            n = (p - self.center[hit_index]) / self.radius[hit_index]
+            front_facing = is_front_facing(ray_direction, n)
+            n = n if front_facing else -n
+
+        return hit_anything, p, n, front_facing, hit_index
+
+
+
+
     @ti.func
     def hit_all(self, ray_origin, ray_direction):
         ''' Intersects a ray against all objects. '''
