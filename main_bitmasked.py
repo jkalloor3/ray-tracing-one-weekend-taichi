@@ -160,14 +160,19 @@ if __name__ == '__main__':
     while num_to_do > 0:
         # print(num_to_do)
         num_to_do = wavefront_queue()
-
-    print('starting big wavefront')
-    t = time()
-    num_to_do = wavefront_initial()
-    while num_to_do > 0:
-        # print(num_to_do)
-        num_to_do = wavefront_queue()
-    finish()
-    ti.sync()
-    print(time() - t)
     ti.imwrite(pixels.to_numpy(), 'out_bitmasked.png')
+
+    res = (512, 512)
+    window = ti.ui.Window("Taichi MLS-MPM-128", res=res, vsync=False)
+
+    while True:
+        print('starting big wavefront')
+        t = time()
+        num_to_do = wavefront_initial()
+        while num_to_do > 0:
+            # print(num_to_do)
+            num_to_do = wavefront_queue()
+        finish()
+        ti.sync()
+        print(time() - t)
+        window.show()

@@ -29,7 +29,7 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 32
+    samples_per_pixel = 8
     max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
@@ -145,14 +145,20 @@ if __name__ == '__main__':
 
     num_pixels = image_width * image_height
 
+    res = (512, 512)
+    window = ti.ui.Window("Taichi MLS-MPM-128", res=res, vsync=False)
+
     num_to_do = wavefront_initial()
     wavefront_queue()
-    ti.sync()
+    ti.imwrite(pixels.to_numpy(), 'out_mega.png')
 
     print('starting big wavefront')
-    t = time()
-    num_to_do = wavefront_initial()
-    wavefront_queue()
-    ti.sync()
-    print(time() - t)
-    ti.imwrite(pixels.to_numpy(), 'out_mega.png')
+    window.show()
+
+    while True:
+        t = time()
+        num_to_do = wavefront_initial()
+        wavefront_queue()
+        ti.sync()
+        print(time() - t)
+        window.show()
