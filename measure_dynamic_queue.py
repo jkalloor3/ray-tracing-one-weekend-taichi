@@ -2,7 +2,6 @@ import numpy as np
 import taichi as ti
 from vector import *
 import ray
-from queue import Queue
 from time import time
 from hittable import World, Sphere
 from camera import Camera
@@ -26,7 +25,7 @@ def get_background(dir):
 if __name__ == '__main__':
     # image data
     aspect_ratio = 3.0 / 2.0
-    with open("queue_output_1.csv", "w", newline="") as csv_file:
+    with open("queue_output_2.csv", "w", newline="") as csv_file:
         csv_writer = csv.writer(csv_file)
 
         for i in range(5, 9, 2):
@@ -144,7 +143,7 @@ if __name__ == '__main__':
                         ray_org, ray_dir, depth, pdf = rays.get(x, y)
 
                         # intersect
-                        hit, p, n, front_facing, index = world.hit_all_slow_1(ray_org, ray_dir)
+                        hit, p, n, front_facing, index = world.hit_all_slow_2(ray_org, ray_dir)
                         depth -= 1
                         rays.depth[x, y] = depth
                         if hit:
@@ -196,5 +195,5 @@ if __name__ == '__main__':
                 print(f'Samples:{samples_per_pixel}')
                 print(f"Time:{time_taken}")
 
-                csv_writer.writerow([image_width, samples_per_pixel, 1, time_taken])
+                csv_writer.writerow([image_width, samples_per_pixel, 2, time_taken])
                 # ti.imwrite(pixels.to_numpy(), 'out_micro.png')
