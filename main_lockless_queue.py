@@ -19,37 +19,41 @@ class Queue:
     def __init__(self, struct, size) -> None:
         self.struct_field = struct.field()
         self.struct_field_lock = ti.field(dtype=ti.i32)
-        ti.root.dense(ti.i, (size)).place(self.struct_field, self.struct_field_lock)
+        ti.root.dense(ti.i, (size)).place(self.struct_field)
+        ti.root.dense(ti.i, (size)).place(self.struct_field_lock)
         self.read_idx = ti.field(dtype=ti.i32, shape=())
         self.write_idx = ti.field(dtype=ti.i32, shape=())
+        self.in_flight_count = ti.field(dtype=ti.i32, shape=())
         self.size = size
+        self.fault = ti.field(dtype=ti.i32, shape=())
         
     @ti.func
     def push(self, struct : ti.template()):
         idx = ti.atomic_add(self.write_idx[()], 1)
-        while True:
-            queue_read_idx = ti.atomic_add(self.read_idx[()], 0)
-            if idx - queue_read_idx <= self.size:
-                break
         self.struct_field[idx % self.size] = struct
+        if self.struct_field_lock[idx % self.size] > 0:
+            self.fault[()] = 1
         self.struct_field_lock[idx % self.size] = 1
         return idx
 
     @ti.kernel
+    def clear_struct_field(self):
+        for i in self.struct_field_lock:
+            self.struct_field_lock[i] = 0
+
     def clear(self):
         self.read_idx[()] = 0
         self.write_idx[()] = 0
+        self.in_flight_count[()] = 0
+        self.clear_struct_field()
 
     @ti.func
-    def pop(self):
+    def reserve(self):
         idx = ti.atomic_add(self.read_idx[()], 1)
         return idx
 
     @ti.func
-    def get(self, idx : ti.i32) -> ti.template():
-        while True:
-            if self.struct_field_lock[idx % self.size] == 1:
-                break
+    def dequeue(self, idx : ti.i32) -> ti.template():
         s = self.struct_field[idx % self.size]
         self.struct_field_lock[idx % self.size] = 0
         return s
@@ -61,6 +65,18 @@ class Queue:
     @ti.func
     def get_write_idx(self) -> ti.i32:
         return ti.atomic_add(self.write_idx[()], 0)
+
+    @ti.func
+    def has_data_arrived(self, idx):
+        return self.struct_field_lock[idx % self.size] > 0
+
+    @ti.func
+    def increment_in_flight(self):
+        self.in_flight_count[()] += 1
+
+    @ti.func
+    def decrement_in_flight(self):
+        self.in_flight_count[()] -= 1
 
 @ti.func
 def get_background(dir):
@@ -76,7 +92,7 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 1
+    samples_per_pixel = 8
     max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
@@ -180,63 +196,82 @@ if __name__ == '__main__':
                 if miss or last bounce sample backgound
             return pixels that hit max samples
         '''
-        for i in range(256 * 6 * 12):
+        ti.block_dim(128)
+        for i in range(128 * 12 * 32):
+            slot = -1
             while True:
-                queue_idx = ray_queue.pop()
-                while True:
-                    queue_write_idx = ray_queue.get_write_idx()
-                    if queue_idx < queue_write_idx or num_completed[()] >= num_pixels:
-                        break
-                ray = ray_queue.get(queue_idx)
-                
+                # Reserve a slot on the queue
+                if slot < 0:
+                    slot = ray_queue.reserve()
+
                 if num_completed[()] >= num_pixels:
                     break
 
+                if not ray_queue.has_data_arrived(slot):
+                    continue
+
+                ray = ray_queue.dequeue(slot)
+                slot = -1
+
+                ray_queue.increment_in_flight()
+
                 # gen sample
                 ray_org, ray_dir, depth, pdf, x, y = ray.org, ray.dir, ray.depth, ray.pdf, ray.x, ray.y
+                depth -= 1
 
                 # intersect
                 hit, p, n, front_facing, index = world.hit_all(
                     ray_org, ray_dir)
-                depth -= 1
-                # rays.depth[x, y] = depth
+
                 if hit:
                     reflected, out_origin, out_direction, attenuation = world.materials.scatter(
                         index, ray_dir, p, n, front_facing)
-                    #rays.set(x, y, out_origin, out_direction, depth,
-                    #         pdf * attenuation)
                     next_ray = ray_sample(org = out_origin, dir = out_direction, depth = depth, x = x, y = y, pdf = pdf * attenuation)
                     ray_queue.push(next_ray)
                     ray_dir = out_direction
 
                 if not hit or depth == 0:
                     pixels[x, y] += pdf * get_background(ray_dir)
-                    if ti.atomic_add(sample_count[x, y], 1) >= samples_per_pixel - 1:
-                        num_completed[()] += 1
-                    else:
+                    sample_count[x, y] += 1
+                    # num_completed[()] += 1
+                    if sample_count[x, y] < samples_per_pixel:
                         u = (x + ti.random()) / (image_width - 1)
                         v = (y + ti.random()) / (image_height - 1)
-                        depth = max_depth
-                        pdf = start_attenuation
                         ray_org, ray_dir = cam.get_ray(u, v)
-                        # rays.set(x, y, ray_org, ray_dir, depth, pdf)
-                        next_ray = ray_sample(org = ray_org, dir = ray_dir, depth = depth, x = x, y = y, pdf = pdf)
+                        next_ray = ray_sample(org = ray_org, dir = ray_dir, depth = max_depth, x = x, y = y, pdf = start_attenuation)
                         ray_queue.push(next_ray)
+                    else:
+                        num_completed[()] += 1
+
+                ray_queue.decrement_in_flight()
 
     num_pixels = image_width * image_height
 
     num_to_do = wavefront_initial()
     wavefront_queue()
     finish()
+    ridx = ray_queue.read_idx[()]
+    widx = ray_queue.write_idx[()]
+    print(ridx, widx, ray_queue.in_flight_count[()], ray_queue.fault[()])
     ray_queue.clear()
     num_completed[()] = 0
+    ti.imwrite(pixels.to_numpy(), 'out_lockless_q.png')
     ti.sync()
 
-    print('starting big wavefront')
-    t = time()
-    num_to_do = wavefront_initial()
-    wavefront_queue()
-    finish()
-    ti.sync()
-    print(time() - t)
-    ti.imwrite(pixels.to_numpy(), 'out_lockless_q.png')
+    res = (512, 512)
+    window = ti.ui.Window("Taichi MLS-MPM-128", res=res, vsync=False)
+
+    while True:
+        ray_queue.clear()
+        num_completed[()] = 0
+        print('starting big wavefront')
+        t = time()
+        num_to_do = wavefront_initial()
+        wavefront_queue()
+        ridx = ray_queue.read_idx[()]
+        widx = ray_queue.write_idx[()]
+        print(ridx, widx, ray_queue.in_flight_count[()], ray_queue.fault[()])
+        finish()
+        ti.sync()
+        print(time() - t)
+        window.show()

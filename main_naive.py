@@ -12,7 +12,7 @@ import random
 
 
 # switch to cpu if needed
-ti.init(arch=ti.gpu, kernel_profiler=True)
+ti.init(arch=ti.gpu)
 
 
 @ti.func
@@ -29,17 +29,14 @@ if __name__ == '__main__':
     # image data
     aspect_ratio = 4.0 / 2.0
     image_width = 2048
-    samples_per_pixel = 1
+    samples_per_pixel = 8
     max_depth = 32
     image_height = int(image_width / aspect_ratio)
     rays = ray.Rays(image_width, image_height)
     pixels = ti.Vector.field(3, dtype=float)
-    inner_queue = ti.field(dtype=ti.i32)
-    # ti.root.dense(ti.i, (image_width * image_height)).place(inner_queue)
     sample_count = ti.field(dtype=ti.i32)
-    ti.root.dense(ti.ij,
-                  (image_width, image_height)).place(pixels, sample_count,
-                                                     inner_queue)
+    ti.root.dense(ti.ij, (image_width, image_height)).place(sample_count)
+    ti.root.dense(ti.ij, (image_width, image_height)).place(pixels)
 
     # materials
     mat_ground = Lambert([0.5, 0.5, 0.5])
@@ -92,16 +89,10 @@ if __name__ == '__main__':
     start_attenuation = Vector(1.0, 1.0, 1.0)
     initial = True
 
-    num_completed = 0
     num_pixels = image_width * image_height
 
     @ti.kernel
-    def finish():
-        for x, y in pixels:
-            pixels[x, y] = ti.sqrt(pixels[x, y] / samples_per_pixel)
-
-    @ti.kernel
-    def wavefront_initial():
+    def wavefront_initial() -> ti.i32:
         for x, y in pixels:
             # gen sample
             depth = max_depth
@@ -115,26 +106,6 @@ if __name__ == '__main__':
             pixels[x, y] = Vector(0.0, 0.0, 0.0)
 
     @ti.kernel
-    def fill_inner_queue() -> ti.i32:
-        ind = 0
-        for x, y in sample_count:
-            if sample_count[x, y] < samples_per_pixel:
-                inner_queue[x, y] = 1
-                ind += 1
-
-        return ind
-
-    # def fix_inner_queue():
-    #     # Put all vectors in first num_to_do spots
-    #     ind = 0
-    #     done = 0
-    #     while done < num_to_do:
-    #         while inner_queue[ind] is ti.Vector([-1,-1]):
-    #             ind += 1
-    #         inner_queue[done] = inner_queue[ind]
-    #         done += 1
-
-    @ti.kernel
     def wavefront_queue():
         ''' Loops over pixels
             for each pixel:
@@ -143,55 +114,55 @@ if __name__ == '__main__':
                 if miss or last bounce sample backgound
             return pixels that hit max samples
         '''
-        for x, y in inner_queue:
-            if inner_queue[x, y] == 0:
-                continue
-            inner_queue[x, y] = 0
-            # gen sample
-            ray_org, ray_dir, depth, pdf = rays.get(x, y)
+        for x, y in pixels:
+            samples = 0
+            while samples < samples_per_pixel:
+                for i in range(max_depth):
+                    # gen sample
+                    ray_org, ray_dir, depth, pdf = rays.get(x, y)
 
-            # intersect
-            hit, p, n, front_facing, index = world.hit_all(ray_org, ray_dir)
-            depth -= 1
-            rays.depth[x, y] = depth
-            if hit:
-                reflected, out_origin, out_direction, attenuation = world.materials.scatter(
-                    index, ray_dir, p, n, front_facing)
-                rays.set(x, y, out_origin, out_direction, depth,
-                         pdf * attenuation)
-                ray_dir = out_direction
+                    # intersect
+                    hit, p, n, front_facing, index = world.hit_all(
+                        ray_org, ray_dir)
+                    depth -= 1
+                    rays.depth[x, y] = depth
+                    if hit:
+                        reflected, out_origin, out_direction, attenuation = world.materials.scatter(
+                            index, ray_dir, p, n, front_facing)
+                        rays.set(x, y, out_origin, out_direction, depth,
+                                pdf * attenuation)
+                        ray_dir = out_direction
 
-            if not hit or depth == 0:
-                sample_count[x, y] += 1
-                pixels[x, y] += pdf * get_background(ray_dir)
-                u = (x + ti.random()) / (image_width - 1)
-                v = (y + ti.random()) / (image_height - 1)
-                depth = max_depth
-                pdf = start_attenuation
-                ray_org, ray_dir = cam.get_ray(u, v)
-                rays.set(x, y, ray_org, ray_dir, depth, pdf)
+                    if not hit or depth == 0:
+                        samples += 1
+                        pixels[x, y] += pdf * get_background(ray_dir)
+                        u = (x + ti.random()) / (image_width - 1)
+                        v = (y + ti.random()) / (image_height - 1)
+                        depth = max_depth
+                        pdf = start_attenuation
+                        ray_org, ray_dir = cam.get_ray(u, v)
+                        rays.set(x, y, ray_org, ray_dir, depth, pdf)
+                        break
+            pixels[x, y] = ti.sqrt(pixels[x, y] / samples)
 
     num_pixels = image_width * image_height
 
-    # Run two times to get rid of JIT
-    wavefront_initial()
-    num_to_do = fill_inner_queue()
-    print(num_to_do)
-    while num_to_do > 0:
-        wavefront_queue()
-        num_to_do = fill_inner_queue()
-    finish()
+    res = (512, 512)
+    window = ti.ui.Window("Taichi MLS-MPM-128", res=res, vsync=False)
 
-    print('starting big wavefront')
-    t = time()
-    wavefront_initial()
-    num_to_do = fill_inner_queue()
-    print(num_to_do)
-    while num_to_do > 0:
-        wavefront_queue()
-        num_to_do = fill_inner_queue()
-    finish()
+    num_to_do = wavefront_initial()
+    wavefront_queue()
     ti.sync()
-    print(time() - t)
-    ti.kernel_profiler_print()
-    ti.imwrite(pixels.to_numpy(), 'out_no_queue.png')
+    ti.imwrite(pixels.to_numpy(), 'out_naive.png')
+
+    window.show()
+
+    while True:
+        print('starting big wavefront')
+        t = time()
+        num_to_do = wavefront_initial()
+        wavefront_queue()
+        ti.sync()
+        print(time() - t)
+
+        window.show()
